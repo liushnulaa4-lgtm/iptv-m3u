@@ -2,9 +2,8 @@ name: Update IPTV Sources
 
 on:
   schedule:
-    # 每天北京时间早上8点运行 (UTC 00:00)
     - cron: '0 0 * * *'
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -22,173 +21,150 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 配置
           RESULTS_PER_ISP=10
           CURRENT_DATE=$(date +%Y/%m/%d)
-          
-          # 创建临时文件
           TEMP_DIR=$(mktemp -d)
-          MOBILE_FILE="$TEMP_DIR/mobile.md"
-          TELECOM_FILE="$TEMP_DIR/telecom.md"
-          UNICOM_FILE="$TEMP_DIR/unicom.md"
           
           echo "开始搜索 IPTV 源..."
           
-          # 搜索移动 IPTV
+          # 移动 IPTV
           echo "搜索移动 IPTV..."
-          echo "## 📱 移动 IPTV M3U 源" > "$MOBILE_FILE"
-          echo "" >> "$MOBILE_FILE"
-          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$MOBILE_FILE"
-          echo "|------|----------|---------|------|------|---------|------|" >> "$MOBILE_FILE"
-          
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=移动+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/mobile_api.json"
+            "https://api.github.com/search/repositories?q=移动+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/mobile.json"
           
-          # 检查 API 响应是否有效
-          if [ ! -s "$TEMP_DIR/mobile_api.json" ]; then
-            echo "错误：无法获取移动 IPTV 数据" >&2
-            cat "$TEMP_DIR/mobile_api.json" >&2
+          echo "API 响应内容:"
+          head -20 "$TEMP_DIR/mobile.json"
+          echo ""
+          
+          if ! jq empty "$TEMP_DIR/mobile.json" 2>/dev/null; then
+            echo "错误：JSON 格式无效"
+            cat "$TEMP_DIR/mobile.json"
             exit 1
           fi
           
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/mobile_api.json" > "$TEMP_DIR/mobile_repos.txt"
+          # 使用简化的 jq 命令
+          jq -r '.items[] | @csv' "$TEMP_DIR/mobile.json" | \
+            awk -v FPAT='[^,]*|"[^"]+"' '{
+              # 解析 CSV
+              gsub(/^"|"$/, "", $1);
+              gsub(/^"|"$/, "", $2);
+              gsub(/^"|"$/, "", $3);
+              gsub(/^"|"$/, "", $4);
+              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
+            }' > "$TEMP_DIR/mobile_repos.txt"
           
-          # 处理移动 IPTV 结果
+          # 生成移动 IPTV Markdown
+          cat > "$TEMP_DIR/mobile.md" << 'EOF'
+          ## 📱 移动 IPTV M3U 源
+          
+          | 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |
+          |------|----------|---------|------|------|---------|------|
+          EOF
+          
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
-            # 跳过空行
             [ -z "$name" ] && continue
             
-            # 获取仓库文件
-            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/$full_name/contents" | \
-              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
-            
-            m3u_link="[查看仓库](https://github.com/$full_name)"
-            file_format="-"
-            
-            if [ -n "$files" ]; then
-              first_file=$(echo "$files" | head -n 1)
-              file_name=$(echo "$first_file" | cut -d'|' -f1)
-              file_url=$(echo "$first_file" | cut -d'|' -f2)
-              file_format=".${file_name##*.}"
-              m3u_link="[$file_name]($file_url)"
-            fi
-            
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$MOBILE_FILE"
+            # 简化处理，只显示仓库链接
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/mobile.md"
             ((rank++))
           done < "$TEMP_DIR/mobile_repos.txt"
           
-          # 搜索电信 IPTV
+          # 电信 IPTV
           echo "搜索电信 IPTV..."
-          echo "## 📞 电信 IPTV M3U 源" > "$TELECOM_FILE"
-          echo "" >> "$TELECOM_FILE"
-          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$TELECOM_FILE"
-          echo "|------|----------|---------|------|------|---------|------|" >> "$TELECOM_FILE"
-          
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=电信+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/telecom_api.json"
+            "https://api.github.com/search/repositories?q=电信+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/telecom.json"
           
-          if [ ! -s "$TEMP_DIR/telecom_api.json" ]; then
-            echo "错误：无法获取电信 IPTV 数据" >&2
-            cat "$TEMP_DIR/telecom_api.json" >&2
+          if ! jq empty "$TEMP_DIR/telecom.json" 2>/dev/null; then
+            echo "错误：JSON 格式无效"
+            cat "$TEMP_DIR/telecom.json"
             exit 1
           fi
           
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/telecom_api.json" > "$TEMP_DIR/telecom_repos.txt"
+          jq -r '.items[] | @csv' "$TEMP_DIR/telecom.json" | \
+            awk -v FPAT='[^,]*|"[^"]+"' '{
+              gsub(/^"|"$/, "", $1);
+              gsub(/^"|"$/, "", $2);
+              gsub(/^"|"$/, "", $3);
+              gsub(/^"|"$/, "", $4);
+              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
+            }' > "$TEMP_DIR/telecom_repos.txt"
+          
+          cat > "$TEMP_DIR/telecom.md" << 'EOF'
+          ## 📞 电信 IPTV M3U 源
+          
+          | 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |
+          |------|----------|---------|------|------|---------|------|
+          EOF
           
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
             [ -z "$name" ] && continue
-            
-            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/$full_name/contents" | \
-              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
-            
-            m3u_link="[查看仓库](https://github.com/$full_name)"
-            file_format="-"
-            
-            if [ -n "$files" ]; then
-              first_file=$(echo "$files" | head -n 1)
-              file_name=$(echo "$first_file" | cut -d'|' -f1)
-              file_url=$(echo "$first_file" | cut -d'|' -f2)
-              file_format=".${file_name##*.}"
-              m3u_link="[$file_name]($file_url)"
-            fi
-            
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$TELECOM_FILE"
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/telecom.md"
             ((rank++))
           done < "$TEMP_DIR/telecom_repos.txt"
           
-          # 搜索联通 IPTV
+          # 联通 IPTV
           echo "搜索联通 IPTV..."
-          echo "## 🔵 联通 IPTV M3U 源" > "$UNICOM_FILE"
-          echo "" >> "$UNICOM_FILE"
-          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$UNICOM_FILE"
-          echo "|------|----------|---------|------|------|---------|------|" >> "$UNICOM_FILE"
-          
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=联通+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/unicom_api.json"
+            "https://api.github.com/search/repositories?q=联通+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/unicom.json"
           
-          if [ ! -s "$TEMP_DIR/unicom_api.json" ]; then
-            echo "错误：无法获取联通 IPTV 数据" >&2
-            cat "$TEMP_DIR/unicom_api.json" >&2
+          if ! jq empty "$TEMP_DIR/unicom.json" 2>/dev/null; then
+            echo "错误：JSON 格式无效"
+            cat "$TEMP_DIR/unicom.json"
             exit 1
           fi
           
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/unicom_api.json" > "$TEMP_DIR/unicom_repos.txt"
+          jq -r '.items[] | @csv' "$TEMP_DIR/unicom.json" | \
+            awk -v FPAT='[^,]*|"[^"]+"' '{
+              gsub(/^"|"$/, "", $1);
+              gsub(/^"|"$/, "", $2);
+              gsub(/^"|"$/, "", $3);
+              gsub(/^"|"$/, "", $4);
+              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
+            }' > "$TEMP_DIR/unicom_repos.txt"
+          
+          cat > "$TEMP_DIR/unicom.md" << 'EOF'
+          ## 🔵 联通 IPTV M3U 源
+          
+          | 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |
+          |------|----------|---------|------|------|---------|------|
+          EOF
           
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
             [ -z "$name" ] && continue
-            
-            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
-              -H "Accept: application/vnd.github.v3+json" \
-              "https://api.github.com/repos/$full_name/contents" | \
-              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
-            
-            m3u_link="[查看仓库](https://github.com/$full_name)"
-            file_format="-"
-            
-            if [ -n "$files" ]; then
-              first_file=$(echo "$files" | head -n 1)
-              file_name=$(echo "$first_file" | cut -d'|' -f1)
-              file_url=$(echo "$first_file" | cut -d'|' -f2)
-              file_format=".${file_name##*.}"
-              m3u_link="[$file_name]($file_url)"
-            fi
-            
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$UNICOM_FILE"
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/unicom.md"
             ((rank++))
           done < "$TEMP_DIR/unicom_repos.txt"
           
           # 合并成完整的 README
-          echo "# 中国 IPTV M3U 源列表（按运营商分类）" > README.md
-          echo "" >> README.md
-          echo "> 最后更新: $CURRENT_DATE" >> README.md
+          cat > README.md << EOF
+          # 中国 IPTV M3U 源列表（按运营商分类）
+          
+          > 最后更新: $CURRENT_DATE
+          
+          ---
+          
+          EOF
+          
+          cat "$TEMP_DIR/mobile.md" >> README.md
           echo "" >> README.md
           echo "---" >> README.md
           echo "" >> README.md
-          cat "$MOBILE_FILE" >> README.md
+          cat "$TEMP_DIR/telecom.md" >> README.md
           echo "" >> README.md
           echo "---" >> README.md
           echo "" >> README.md
-          cat "$TELECOM_FILE" >> README.md
-          echo "" >> README.md
-          echo "---" >> README.md
-          echo "" >> README.md
-          cat "$UNICOM_FILE" >> README.md
+          cat "$TEMP_DIR/unicom.md" >> README.md
           echo "" >> README.md
           echo "---" >> README.md
           echo "" >> README.md
           
-          # 添加使用说明
-          cat << 'EOF' >> README.md
+          cat >> README.md << 'ENDMARKER'
           ## 使用说明
           
           ### 网络要求
@@ -220,11 +196,9 @@ jobs:
           
           ## License
           [CC0-1.0 license](https://github.com/public-domain/cc-zero-1.0)
-          EOF
+          ENDMARKER
           
-          # 清理临时目录
           rm -rf "$TEMP_DIR"
-          
           echo "✓ README.md 生成完成"
 
       - name: Archive old readme
@@ -232,10 +206,7 @@ jobs:
           if [ -f "README.md" ]; then
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             mv "README.md" "README_${TIMESTAMP}.md"
-            echo "✓ 已归档为 README_${TIMESTAMP}.md"
-            # 只保留最近30个历史文件
             ls -t README_*.md | tail -n +31 | xargs -r rm -f
-            echo "✓ 已清理旧的历史文件"
           fi
 
       - name: Commit and push changes
