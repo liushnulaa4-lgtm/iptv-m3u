@@ -49,7 +49,18 @@ jobs:
           
           # 使用简化的 jq 命令 - 只选择需要的字段
           # 使用简化的 jq 命令 - 直接输出用 | 分隔的格式
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/mobile.json" > "$TEMP_DIR/mobile_repos.txt"
+          # 检查是否有数据
+          item_count=$(jq '.items | length' "$TEMP_DIR/mobile.json")
+          echo "找到 $item_count 个移动 IPTV 仓库"
+
+          if [ "$item_count" -eq 0 ]; then
+            echo "警告：没有找到移动 IPTV 数据"
+          else
+            jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/mobile.json" > "$TEMP_DIR/mobile_repos.txt"
+            echo "jq 输出检查:"
+            head -5 "$TEMP_DIR/mobile_repos.txt" || echo "文件为空"
+            echo ""
+          fi
           
           # 生成移动 IPTV Markdown
           cat > "$TEMP_DIR/mobile.md" << 'EOF'
@@ -60,12 +71,17 @@ jobs:
           EOF
 
           rank=1
+          processed_count=0
           while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
 
             echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/mobile.md"
             ((rank++))
+            ((processed_count++))
           done < "$TEMP_DIR/mobile_repos.txt"
+
+          echo "处理了 $processed_count 个移动 IPTV 仓库"
+          echo ""
           
           # 电信 IPTV
           echo "搜索电信 IPTV..."
@@ -83,7 +99,17 @@ jobs:
             exit 1
           fi
 
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/telecom.json" > "$TEMP_DIR/telecom_repos.txt"
+          item_count=$(jq '.items | length' "$TEMP_DIR/telecom.json")
+          echo "找到 $item_count 个电信 IPTV 仓库"
+
+          if [ "$item_count" -eq 0 ]; then
+            echo "警告：没有找到电信 IPTV 数据"
+          else
+            jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/telecom.json" > "$TEMP_DIR/telecom_repos.txt"
+            echo "jq 输出检查:"
+            head -5 "$TEMP_DIR/telecom_repos.txt" || echo "文件为空"
+            echo ""
+          fi
           
           cat > "$TEMP_DIR/telecom.md" << 'EOF'
           ## 📞 电信 IPTV M3U 源
@@ -93,11 +119,16 @@ jobs:
           EOF
           
           rank=1
+          processed_count=0
           while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
             echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/telecom.md"
             ((rank++))
+            ((processed_count++))
           done < "$TEMP_DIR/telecom_repos.txt"
+
+          echo "处理了 $processed_count 个电信 IPTV 仓库"
+          echo ""
           
           # 联通 IPTV
           echo "搜索联通 IPTV..."
@@ -115,7 +146,17 @@ jobs:
             exit 1
           fi
 
-          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/unicom.json" > "$TEMP_DIR/unicom_repos.txt"
+          item_count=$(jq '.items | length' "$TEMP_DIR/unicom.json")
+          echo "找到 $item_count 个联通 IPTV 仓库"
+
+          if [ "$item_count" -eq 0 ]; then
+            echo "警告：没有找到联通 IPTV 数据"
+          else
+            jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/unicom.json" > "$TEMP_DIR/unicom_repos.txt"
+            echo "jq 输出检查:"
+            head -5 "$TEMP_DIR/unicom_repos.txt" || echo "文件为空"
+            echo ""
+          fi
           
           cat > "$TEMP_DIR/unicom.md" << 'EOF'
           ## 🔵 联通 IPTV M3U 源
@@ -125,11 +166,16 @@ jobs:
           EOF
           
           rank=1
+          processed_count=0
           while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
             echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/unicom.md"
             ((rank++))
+            ((processed_count++))
           done < "$TEMP_DIR/unicom_repos.txt"
+
+          echo "处理了 $processed_count 个联通 IPTV 仓库"
+          echo ""
           
           # 合并成完整的 README
           cat > README.md << EOF
@@ -189,6 +235,10 @@ jobs:
           ENDMARKER
           
           rm -rf "$TEMP_DIR"
+
+          echo "最终 README.md 检查:"
+          wc -l README.md
+          echo ""
           echo "✓ README.md 生成完成"
 
       - name: Archive old readme
