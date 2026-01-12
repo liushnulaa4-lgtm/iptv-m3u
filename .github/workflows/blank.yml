@@ -31,7 +31,11 @@ jobs:
           echo "搜索移动 IPTV..."
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=移动+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/mobile.json"
+            -G --data-urlencode "q=移动 iptv" \
+            --data-urlencode "sort=updated" \
+            --data-urlencode "order=desc" \
+            --data-urlencode "per_page=$RESULTS_PER_ISP" \
+            "https://api.github.com/search/repositories" > "$TEMP_DIR/mobile.json"
           
           echo "API 响应内容:"
           head -20 "$TEMP_DIR/mobile.json"
@@ -75,7 +79,11 @@ jobs:
           echo "搜索电信 IPTV..."
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=电信+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/telecom.json"
+            -G --data-urlencode "q=电信 iptv" \
+            --data-urlencode "sort=updated" \
+            --data-urlencode "order=desc" \
+            --data-urlencode "per_page=$RESULTS_PER_ISP" \
+            "https://api.github.com/search/repositories" > "$TEMP_DIR/telecom.json"
           
           if ! jq empty "$TEMP_DIR/telecom.json" 2>/dev/null; then
             echo "错误：JSON 格式无效"
@@ -110,7 +118,11 @@ jobs:
           echo "搜索联通 IPTV..."
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=联通+iptv&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/unicom.json"
+            -G --data-urlencode "q=联通 iptv" \
+            --data-urlencode "sort=updated" \
+            --data-urlencode "order=desc" \
+            --data-urlencode "per_page=$RESULTS_PER_ISP" \
+            "https://api.github.com/search/repositories" > "$TEMP_DIR/unicom.json"
           
           if ! jq empty "$TEMP_DIR/unicom.json" 2>/dev/null; then
             echo "错误：JSON 格式无效"
