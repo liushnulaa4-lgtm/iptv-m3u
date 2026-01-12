@@ -36,20 +36,30 @@ jobs:
           
           # 搜索移动 IPTV
           echo "搜索移动 IPTV..."
-          echo "## 📱 移动 IPTV M3U 源" >> "$MOBILE_FILE"
+          echo "## 📱 移动 IPTV M3U 源" > "$MOBILE_FILE"
           echo "" >> "$MOBILE_FILE"
           echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$MOBILE_FILE"
           echo "|------|----------|---------|------|------|---------|------|" >> "$MOBILE_FILE"
           
-          # 使用 curl 和 jq 搜索并处理
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=移动+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
-            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/mobile_repos.txt"
+            "https://api.github.com/search/repositories?q=移动+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/mobile_api.json"
+          
+          # 检查 API 响应是否有效
+          if [ ! -s "$TEMP_DIR/mobile_api.json" ]; then
+            echo "错误：无法获取移动 IPTV 数据" >&2
+            cat "$TEMP_DIR/mobile_api.json" >&2
+            exit 1
+          fi
+          
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/mobile_api.json" > "$TEMP_DIR/mobile_repos.txt"
           
           # 处理移动 IPTV 结果
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
+            # 跳过空行
+            [ -z "$name" ] && continue
+            
             # 获取仓库文件
             files=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
@@ -73,18 +83,27 @@ jobs:
           
           # 搜索电信 IPTV
           echo "搜索电信 IPTV..."
-          echo "## 📞 电信 IPTV M3U 源" >> "$TELECOM_FILE"
+          echo "## 📞 电信 IPTV M3U 源" > "$TELECOM_FILE"
           echo "" >> "$TELECOM_FILE"
           echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$TELECOM_FILE"
           echo "|------|----------|---------|------|------|---------|------|" >> "$TELECOM_FILE"
           
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=电信+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
-            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/telecom_repos.txt"
+            "https://api.github.com/search/repositories?q=电信+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/telecom_api.json"
+          
+          if [ ! -s "$TEMP_DIR/telecom_api.json" ]; then
+            echo "错误：无法获取电信 IPTV 数据" >&2
+            cat "$TEMP_DIR/telecom_api.json" >&2
+            exit 1
+          fi
+          
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/telecom_api.json" > "$TEMP_DIR/telecom_repos.txt"
           
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
+            [ -z "$name" ] && continue
+            
             files=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/$full_name/contents" | \
@@ -107,18 +126,27 @@ jobs:
           
           # 搜索联通 IPTV
           echo "搜索联通 IPTV..."
-          echo "## 🔵 联通 IPTV M3U 源" >> "$UNICOM_FILE"
+          echo "## 🔵 联通 IPTV M3U 源" > "$UNICOM_FILE"
           echo "" >> "$UNICOM_FILE"
           echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$UNICOM_FILE"
           echo "|------|----------|---------|------|------|---------|------|" >> "$UNICOM_FILE"
           
           curl -s -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/search/repositories?q=联通+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
-            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/unicom_repos.txt"
+            "https://api.github.com/search/repositories?q=联通+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=$RESULTS_PER_ISP" > "$TEMP_DIR/unicom_api.json"
+          
+          if [ ! -s "$TEMP_DIR/unicom_api.json" ]; then
+            echo "错误：无法获取联通 IPTV 数据" >&2
+            cat "$TEMP_DIR/unicom_api.json" >&2
+            exit 1
+          fi
+          
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' < "$TEMP_DIR/unicom_api.json" > "$TEMP_DIR/unicom_repos.txt"
           
           rank=1
           while IFS='|' read -r name updated stars description full_name; do
+            [ -z "$name" ] && continue
+            
             files=$(curl -s -H "Authorization: token $GH_TOKEN" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/$full_name/contents" | \
