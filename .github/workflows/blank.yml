@@ -47,31 +47,23 @@ jobs:
             exit 1
           fi
           
-          # 使用简化的 jq 命令
-          jq -r '.items[] | @csv' "$TEMP_DIR/mobile.json" | \
-            awk -v FPAT='[^,]*|"[^"]+"' '{
-              # 解析 CSV
-              gsub(/^"|"$/, "", $1);
-              gsub(/^"|"$/, "", $2);
-              gsub(/^"|"$/, "", $3);
-              gsub(/^"|"$/, "", $4);
-              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
-            }' > "$TEMP_DIR/mobile_repos.txt"
+          # 使用简化的 jq 命令 - 只选择需要的字段
+          # 使用简化的 jq 命令 - 直接输出用 | 分隔的格式
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/mobile.json" > "$TEMP_DIR/mobile_repos.txt"
           
           # 生成移动 IPTV Markdown
           cat > "$TEMP_DIR/mobile.md" << 'EOF'
           ## 📱 移动 IPTV M3U 源
-          
+
           | 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |
           |------|----------|---------|------|------|---------|------|
           EOF
-          
+
           rank=1
-          while IFS='|' read -r name updated stars description full_name; do
+          while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
-            
-            # 简化处理，只显示仓库链接
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/mobile.md"
+
+            echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/mobile.md"
             ((rank++))
           done < "$TEMP_DIR/mobile_repos.txt"
           
@@ -90,15 +82,8 @@ jobs:
             cat "$TEMP_DIR/telecom.json"
             exit 1
           fi
-          
-          jq -r '.items[] | @csv' "$TEMP_DIR/telecom.json" | \
-            awk -v FPAT='[^,]*|"[^"]+"' '{
-              gsub(/^"|"$/, "", $1);
-              gsub(/^"|"$/, "", $2);
-              gsub(/^"|"$/, "", $3);
-              gsub(/^"|"$/, "", $4);
-              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
-            }' > "$TEMP_DIR/telecom_repos.txt"
+
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/telecom.json" > "$TEMP_DIR/telecom_repos.txt"
           
           cat > "$TEMP_DIR/telecom.md" << 'EOF'
           ## 📞 电信 IPTV M3U 源
@@ -108,9 +93,9 @@ jobs:
           EOF
           
           rank=1
-          while IFS='|' read -r name updated stars description full_name; do
+          while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/telecom.md"
+            echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/telecom.md"
             ((rank++))
           done < "$TEMP_DIR/telecom_repos.txt"
           
@@ -129,15 +114,8 @@ jobs:
             cat "$TEMP_DIR/unicom.json"
             exit 1
           fi
-          
-          jq -r '.items[] | @csv' "$TEMP_DIR/unicom.json" | \
-            awk -v FPAT='[^,]*|"[^"]+"' '{
-              gsub(/^"|"$/, "", $1);
-              gsub(/^"|"$/, "", $2);
-              gsub(/^"|"$/, "", $3);
-              gsub(/^"|"$/, "", $4);
-              print $1 "|" substr($3,2,10) "|" $4 "|" $5 "|" $7
-            }' > "$TEMP_DIR/unicom_repos.txt"
+
+          jq -r '.items[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "")|\(.owner.login)/\(.full_name)"' "$TEMP_DIR/unicom.json" > "$TEMP_DIR/unicom_repos.txt"
           
           cat > "$TEMP_DIR/unicom.md" << 'EOF'
           ## 🔵 联通 IPTV M3U 源
@@ -147,9 +125,9 @@ jobs:
           EOF
           
           rank=1
-          while IFS='|' read -r name updated stars description full_name; do
+          while IFS='|' read -r name updated stars description repo_path; do
             [ -z "$name" ] && continue
-            echo "| $rank | [$name](https://github.com/$full_name) | $updated | - | $stars | [查看仓库](https://github.com/$full_name) | $description |" >> "$TEMP_DIR/unicom.md"
+            echo "| $rank | [$name](https://github.com/$repo_path) | $updated | - | $stars | [查看仓库](https://github.com/$repo_path) | $description |" >> "$TEMP_DIR/unicom.md"
             ((rank++))
           done < "$TEMP_DIR/unicom_repos.txt"
           
