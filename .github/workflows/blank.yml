@@ -1,0 +1,224 @@
+name: Update IPTV Sources
+
+on:
+  schedule:
+    # 每天北京时间早上8点运行 (UTC 00:00)
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  update-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update IPTV Sources
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 配置
+          RESULTS_PER_ISP=10
+          CURRENT_DATE=$(date +%Y/%m/%d)
+          
+          # 创建临时文件
+          TEMP_DIR=$(mktemp -d)
+          MOBILE_FILE="$TEMP_DIR/mobile.md"
+          TELECOM_FILE="$TEMP_DIR/telecom.md"
+          UNICOM_FILE="$TEMP_DIR/unicom.md"
+          
+          echo "开始搜索 IPTV 源..."
+          
+          # 搜索移动 IPTV
+          echo "搜索移动 IPTV..."
+          echo "## 📱 移动 IPTV M3U 源" >> "$MOBILE_FILE"
+          echo "" >> "$MOBILE_FILE"
+          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$MOBILE_FILE"
+          echo "|------|----------|---------|------|------|---------|------|" >> "$MOBILE_FILE"
+          
+          # 使用 curl 和 jq 搜索并处理
+          curl -s -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/search/repositories?q=移动+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
+            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/mobile_repos.txt"
+          
+          # 处理移动 IPTV 结果
+          rank=1
+          while IFS='|' read -r name updated stars description full_name; do
+            # 获取仓库文件
+            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$full_name/contents" | \
+              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
+            
+            m3u_link="[查看仓库](https://github.com/$full_name)"
+            file_format="-"
+            
+            if [ -n "$files" ]; then
+              first_file=$(echo "$files" | head -n 1)
+              file_name=$(echo "$first_file" | cut -d'|' -f1)
+              file_url=$(echo "$first_file" | cut -d'|' -f2)
+              file_format=".${file_name##*.}"
+              m3u_link="[$file_name]($file_url)"
+            fi
+            
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$MOBILE_FILE"
+            ((rank++))
+          done < "$TEMP_DIR/mobile_repos.txt"
+          
+          # 搜索电信 IPTV
+          echo "搜索电信 IPTV..."
+          echo "## 📞 电信 IPTV M3U 源" >> "$TELECOM_FILE"
+          echo "" >> "$TELECOM_FILE"
+          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$TELECOM_FILE"
+          echo "|------|----------|---------|------|------|---------|------|" >> "$TELECOM_FILE"
+          
+          curl -s -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/search/repositories?q=电信+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
+            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/telecom_repos.txt"
+          
+          rank=1
+          while IFS='|' read -r name updated stars description full_name; do
+            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$full_name/contents" | \
+              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
+            
+            m3u_link="[查看仓库](https://github.com/$full_name)"
+            file_format="-"
+            
+            if [ -n "$files" ]; then
+              first_file=$(echo "$files" | head -n 1)
+              file_name=$(echo "$first_file" | cut -d'|' -f1)
+              file_url=$(echo "$first_file" | cut -d'|' -f2)
+              file_format=".${file_name##*.}"
+              m3u_link="[$file_name]($file_url)"
+            fi
+            
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$TELECOM_FILE"
+            ((rank++))
+          done < "$TEMP_DIR/telecom_repos.txt"
+          
+          # 搜索联通 IPTV
+          echo "搜索联通 IPTV..."
+          echo "## 🔵 联通 IPTV M3U 源" >> "$UNICOM_FILE"
+          echo "" >> "$UNICOM_FILE"
+          echo "| 排名 | 省份/地区 | 更新时间 | 格式 | 星标 | M3U地址 | 特点 |" >> "$UNICOM_FILE"
+          echo "|------|----------|---------|------|------|---------|------|" >> "$UNICOM_FILE"
+          
+          curl -s -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/search/repositories?q=联通+iptv+language:all+type:repositories&sort=updated&order=desc&per_page=50" | \
+            jq -r '.items[:'"$RESULTS_PER_ISP"'] | .[] | "\(.name)|\(.updated_at[0:10])|⭐\(.stargazers_count)|\(.description // "暂无描述")|\(.owner.login)/\(.name)"' > "$TEMP_DIR/unicom_repos.txt"
+          
+          rank=1
+          while IFS='|' read -r name updated stars description full_name; do
+            files=$(curl -s -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$full_name/contents" | \
+              jq -r '.[] | select(.type == "file" and (.name | endswith(".m3u") or endswith(".m3u8"))) | "\(.name)|\(.download_url)"')
+            
+            m3u_link="[查看仓库](https://github.com/$full_name)"
+            file_format="-"
+            
+            if [ -n "$files" ]; then
+              first_file=$(echo "$files" | head -n 1)
+              file_name=$(echo "$first_file" | cut -d'|' -f1)
+              file_url=$(echo "$first_file" | cut -d'|' -f2)
+              file_format=".${file_name##*.}"
+              m3u_link="[$file_name]($file_url)"
+            fi
+            
+            echo "| $rank | [$name](https://github.com/$full_name) | $updated | $file_format | $stars | $m3u_link | $description |" >> "$UNICOM_FILE"
+            ((rank++))
+          done < "$TEMP_DIR/unicom_repos.txt"
+          
+          # 合并成完整的 README
+          echo "# 中国 IPTV M3U 源列表（按运营商分类）" > README.md
+          echo "" >> README.md
+          echo "> 最后更新: $CURRENT_DATE" >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          cat "$MOBILE_FILE" >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          cat "$TELECOM_FILE" >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          cat "$UNICOM_FILE" >> README.md
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "" >> README.md
+          
+          # 添加使用说明
+          cat << 'EOF' >> README.md
+          ## 使用说明
+          
+          ### 网络要求
+          - 这些源需要在对应运营商的网络环境下使用
+          - 移动 IPTV 需要中国移动网络环境
+          - 电信 IPTV 需要中国电信网络环境
+          - 联通 IPTV 需要中国联通网络环境
+          
+          ### 播放器推荐
+          - **Android**: mytv-android、IPTV Pro
+          - **Windows**: Potplayer、VLC Media Player
+          - **iOS**: GSE IPTV、nPlayer
+          - **macOS**: IINA、VLC Media Player
+          
+          ### 常见问题
+          1. **无法播放**: 请检查网络环境，确保使用对应的运营商网络
+          2. **部分频道不可用**: 可能是源失效，建议使用最新更新的源
+          3. **加载缓慢**: 建议使用 jsDelivr 或其他 CDN 镜像加速
+          
+          ### 镜像加速
+          部分仓库提供了镜像加速访问：
+          - jsDelivr: `https://cdn.jsdelivr.net/gh/用户名/仓库名@分支/文件路径`
+          - GitHub Proxy: `https://ghproxy.com/https://raw.githubusercontent.com/用户名/仓库名/分支/文件路径`
+          
+          ---
+          
+          > 本项目由 GitHub Actions 自动更新，每天北京时间早上 8 点自动同步最新数据
+          > 数据来源: GitHub 公开仓库搜索结果
+          
+          ## License
+          [CC0-1.0 license](https://github.com/public-domain/cc-zero-1.0)
+          EOF
+          
+          # 清理临时目录
+          rm -rf "$TEMP_DIR"
+          
+          echo "✓ README.md 生成完成"
+
+      - name: Archive old readme
+        run: |
+          if [ -f "README.md" ]; then
+            TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+            mv "README.md" "README_${TIMESTAMP}.md"
+            echo "✓ 已归档为 README_${TIMESTAMP}.md"
+            # 只保留最近30个历史文件
+            ls -t README_*.md | tail -n +31 | xargs -r rm -f
+            echo "✓ 已清理旧的历史文件"
+          fi
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add README.md README_*.md || true
+          if git diff --staged --quiet; then
+            echo "✓ 没有需要提交的更改"
+          else
+            git commit -m "Update IPTV sources - $(date +'%Y-%m-%d %H:%M:%S')"
+            git push
+            echo "✓ 已推送到 GitHub"
+          fi
